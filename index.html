@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShipLog — Your changelog, written for you</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* ── THEME TOKENS ── */
+    :root {
+      /* Light (Claude-style warm off-white) */
+      --bg: #f7f5f2;
+      --bg-secondary: #eeece8;
+      --bg-card: #ffffff;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.14);
+      --text: #1a1816;
+      --text-muted: #6b6560;
+      --text-dim: #9c9690;
+      --accent: #1a1816;
+      --accent-fg: #f7f5f2;
+      --pill-bg: rgba(0, 0, 0, 0.05);
+      --pill-border: rgba(0, 0, 0, 0.12);
+      --header-bg: rgba(247, 245, 242, 0.82);
+      --header-border: rgba(0, 0, 0, 0.09);
+      --tag-fixed-bg: rgba(22, 163, 74, 0.12);
+      --tag-fixed-fg: #15803d;
+      --tag-impr-bg: rgba(202, 138, 4, 0.12);
+      --tag-impr-fg: #b45309;
+      --tag-new-bg: rgba(37, 99, 235, 0.1);
+      --tag-new-fg: #1d4ed8;
+      --badge-bg: rgba(0, 0, 0, 0.055);
+      --badge-border: rgba(0, 0, 0, 0.1);
+      --dot-color: #16a34a;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.1);
+      --mono-bg: rgba(0, 0, 0, 0.04);
+      --mono-text: rgba(0, 0, 0, 0.5);
+      --feat-hover: rgba(0, 0, 0, 0.025);
+      --toggle-bg: rgba(0, 0, 0, 0.07);
+      --toggle-knob: #fff;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f1012;
+      --bg-secondary: #17191d;
+      --bg-card: #1c1e22;
+      --border: rgba(255, 255, 255, 0.07);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --text: #f0ede8;
+      --text-muted: rgba(240, 237, 232, 0.55);
+      --text-dim: rgba(240, 237, 232, 0.3);
+      --accent: #f0ede8;
+      --accent-fg: #0f1012;
+      --pill-bg: rgba(255, 255, 255, 0.07);
+      --pill-border: rgba(255, 255, 255, 0.14);
+      --header-bg: rgba(15, 16, 18, 0.88);
+      --header-border: rgba(255, 255, 255, 0.08);
+      --tag-fixed-bg: rgba(52, 211, 153, 0.12);
+      --tag-fixed-fg: #34d399;
+      --tag-impr-bg: rgba(251, 191, 36, 0.12);
+      --tag-impr-fg: #fbbf24;
+      --tag-new-bg: rgba(96, 165, 250, 0.12);
+      --tag-new-fg: #60a5fa;
+      --badge-bg: rgba(255, 255, 255, 0.06);
+      --badge-border: rgba(255, 255, 255, 0.1);
+      --dot-color: #34d399;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.35);
+      --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+      --mono-bg: rgba(255, 255, 255, 0.05);
+      --mono-text: rgba(255, 255, 255, 0.4);
+      --feat-hover: rgba(255, 255, 255, 0.04);
+      --toggle-bg: rgba(255, 255, 255, 0.1);
+      --toggle-knob: #f0ede8;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* ── HEADER ── */
+    .header-wrap {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 40px);
+      max-width: 860px;
+      z-index: 100;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 9px 9px 18px;
+      border-radius: 100px;
+      background: var(--header-bg);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--header-border);
+      box-shadow: var(--shadow-md);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--text);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .logo-icon svg {
+      display: block;
+    }
+
+    .logo-text {
+      font-size: 15.5px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      transition: color 0.3s;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    nav a {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 7px 15px;
+      border-radius: 100px;
+      transition: color 0.2s, background 0.2s;
+      white-space: nowrap;
+    }
+
+    nav a:hover {
+      color: var(--text);
+      background: var(--pill-bg);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Theme toggle */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      background: var(--toggle-bg);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 10px;
+      transition: background 0.3s, border-color 0.3s;
+      user-select: none;
+    }
+
+    .theme-toggle:hover {
+      background: var(--pill-bg);
+    }
+
+    .toggle-icon {
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .toggle-track {
+      width: 28px;
+      height: 16px;
+      background: var(--toggle-bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 100px;
+      position: relative;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text);
+      transition: transform 0.25s, background 0.3s;
+    }
+
+    [data-theme="dark"] .toggle-knob {
+      transform: translateX(12px);
+    }
+
+    .btn-start {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent-fg);
+      background: var(--accent);
+      border: none;
+      padding: 9px 18px;
+      border-radius: 100px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.15s, background 0.3s, color 0.3s;
+      white-space: nowrap;
+      display: block;
+    }
+
+    .btn-start:hover {
+      opacity: 0.85;
+      transform: translateY(-1px);
+    }
+
+    /* ── PAGE ── */
+    .page {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 130px 24px 90px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-muted);
+      border: 1px solid var(--badge-border);
+      background: var(--badge-bg);
+      padding: 5px 16px 5px 11px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+      backdrop-filter: blur(8px);
+      transition: background 0.3s, border-color 0.3s, color 0.3s;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--dot-color);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--dot-color);
+      animation: pdot 2.5s ease-in-out infinite;
+    }
+
+    @keyframes pdot {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: .4;
+        transform: scale(.7);
+      }
+    }
+
+    .hero h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(44px, 7vw, 86px);
+      line-height: 1.03;
+      letter-spacing: -2.5px;
+      color: var(--text);
+      max-width: 720px;
+      margin-bottom: 18px;
+      transition: color 0.3s;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--text-dim);
+    }
+
+    .hero-sub {
+      font-size: clamp(15px, 1.8vw, 17px);
+      color: var(--text-muted);
+      max-width: 420px;
+      line-height: 1.72;
+      font-weight: 300;
+      margin-bottom: 44px;
+      transition: color 0.3s;
+    }
+
+    /* ── GLASS EMAIL PILL ── */
+    .email-pill-wrap {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .email-pill {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 100px;
+      padding: 5px 5px 5px 22px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: var(--shadow-sm);
+      transition: border-color .2s, box-shadow .2s, background 0.3s;
+    }
+
+    .email-pill:focus-within {
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-md);
+    }
+
+    .email-pill.error {
+      border-color: rgba(220, 60, 50, 0.5);
+      box-shadow: 0 0 0 3px rgba(220, 60, 50, 0.08);
+    }
+
+    .email-pill input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      min-width: 0;
+    }
+
+    .email-pill input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .btn-pill {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--accent-fg);
+      background: var(--accent);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: opacity .2s, transform .15s, background 0.3s, color 0.3s;
+      white-space: nowrap;
+      letter-spacing: -.1px;
+    }
+
+    .btn-pill:hover {
+      opacity: .85;
+      transform: scale(.97);
+    }
+
+    .btn-pill .arr {
+      transition: transform .2s;
+      display: inline-block;
+    }
+
+    .btn-pill:hover .arr {
+      transform: translateX(3px);
+    }
+
+    .pill-note {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.3s;
+    }
+
+    .pill-success {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--tag-fixed-fg);
+      background: var(--tag-fixed-bg);
+      border: 1px solid currentColor;
+      border-color: var(--tag-fixed-fg);
+      border-radius: 100px;
+      padding: 13px 26px;
+      max-width: 480px;
+      justify-content: center;
+      opacity: 0.85;
+    }
+
+    /* ── COUNT ROW ── */
+    .count-row {
+      margin-top: 34px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatars {
+      display: flex;
+    }
+
+    .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+      margin-left: -8px;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 600;
+      transition: border-color 0.3s;
+    }
+
+    .avatar:first-child {
+      margin-left: 0;
+    }
+
+    .av1 {
+      background: linear-gradient(135deg, #3ecfff, #1a6eff);
+    }
+
+    .av2 {
+      background: linear-gradient(135deg, #ff7e5f, #ff4fa3);
+    }
+
+    .av3 {
+      background: linear-gradient(135deg, #a3e635, #059669);
+    }
+
+    .av4 {
+      background: var(--bg-secondary);
+      color: var(--text-muted);
+    }
+
+    .count-text {
+      font-size: 13px;
+      color: var(--text-dim);
+      transition: color 0.3s;
+    }
+
+    .count-text strong {
+      color: var(--text-muted);
+    }
+
+    /* ── DIVIDER ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+      transition: border-color 0.3s;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .how {
+      padding: 90px 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* ── SECTION WRAPPER ── */
+    .section-inner {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+      transition: color 0.3s;
+    }
+
+    .section-headline {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(30px, 4.5vw, 52px);
+      letter-spacing: -1.5px;
+      line-height: 1.08;
+      text-align: center;
+      color: var(--text);
+      margin-bottom: 12px;
+      transition: color 0.3s;
+    }
+
+    .section-headline em {
+      font-style: italic;
+      color: var(--text-dim);
+    }
+
+    .section-desc {
+      text-align: center;
+      font-size: 16px;
+      color: var(--text-muted);
+      max-width: 440px;
+      margin: 0 auto 56px;
+      line-height: 1.7;
+      font-weight: 300;
+      transition: color 0.3s;
+    }
+
+    /* ── SOURCE TYPES ── */
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 60px;
+    }
+
+    .source-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 22px;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .source-card:hover {
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-md);
+    }
+
+    .source-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      font-size: 18px;
+    }
+
+    .ic-green {
+      background: var(--tag-fixed-bg);
+    }
+
+    .ic-blue {
+      background: var(--tag-new-bg);
+    }
+
+    .ic-amber {
+      background: var(--tag-impr-bg);
+    }
+
+    .source-card h3 {
+      font-size: 14.5px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -.2px;
+      transition: color 0.3s;
+    }
+
+    .source-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      font-weight: 300;
+      transition: color 0.3s;
+    }
+
+    /* ── TRANSFORM DEMO ── */
+    .transform-demo {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px 30px;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .demo-dots {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+
+    .dd {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dd.r {
+      background: #ff5f57;
+    }
+
+    .dd.y {
+      background: #febc2e;
+    }
+
+    .dd.g {
+      background: #28c840;
+    }
+
+    .demo-label {
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      transition: color 0.3s;
+    }
+
+    .demo-cols {
+      display: grid;
+      grid-template-columns: 1fr 32px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .demo-raw {
+      font-family: monospace;
+      font-size: 12.5px;
+      color: var(--mono-text);
+      background: var(--mono-bg);
+      border-radius: 10px;
+      padding: 14px 16px;
+      line-height: 1.75;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .demo-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-top: 34px;
+      color: var(--text-dim);
+      font-size: 16px;
+    }
+
+    .demo-out {
+      padding: 14px 0;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.72;
+      transition: color 0.3s;
+    }
+
+    .demo-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 5px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .tag.fx {
+      background: var(--tag-fixed-bg);
+      color: var(--tag-fixed-fg);
+    }
+
+    .tag.im {
+      background: var(--tag-impr-bg);
+      color: var(--tag-impr-fg);
+    }
+
+    .tag.nw {
+      background: var(--tag-new-bg);
+      color: var(--tag-new-fg);
+    }
+
+    /* ── PRODUCT SECTION ── */
+    .product {
+      padding: 90px 24px;
+      background: var(--bg-secondary);
+      transition: background 0.3s;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .feat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 20px;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .feat-card:hover {
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-md);
+    }
+
+    .feat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      font-size: 16px;
+    }
+
+    .feat-card h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 7px;
+      letter-spacing: -.2px;
+      transition: color 0.3s;
+    }
+
+    .feat-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      font-weight: 300;
+      transition: color 0.3s;
+    }
+
+    /* ── HOSTED CHANGELOG ── */
+    .hosted {
+      padding: 90px 24px;
+    }
+
+    .hosted-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hosted-text h2 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(28px, 4vw, 44px);
+      letter-spacing: -1.2px;
+      line-height: 1.1;
+      color: var(--text);
+      margin-bottom: 14px;
+      transition: color 0.3s;
+    }
+
+    .hosted-text h2 em {
+      font-style: italic;
+      color: var(--text-dim);
+    }
+
+    .hosted-text p {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.72;
+      font-weight: 300;
+      margin-bottom: 20px;
+      transition: color 0.3s;
+    }
+
+    .hosted-url {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-family: monospace;
+      color: var(--tag-new-fg);
+      background: var(--tag-new-bg);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--tag-new-fg);
+      opacity: 0.75;
+      letter-spacing: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .hosted-preview {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .preview-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .preview-dd {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .preview-dd.r {
+      background: #ff5f57;
+    }
+
+    .preview-dd.y {
+      background: #febc2e;
+    }
+
+    .preview-dd.g {
+      background: #28c840;
+    }
+
+    .preview-url {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      font-family: monospace;
+      color: var(--text-dim);
+      transition: color 0.3s;
+    }
+
+    .preview-body {
+      padding: 20px;
+    }
+
+    .preview-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: 17px;
+      color: var(--text);
+      margin-bottom: 16px;
+      letter-spacing: -.3px;
+      transition: color 0.3s;
+    }
+
+    .preview-entry {
+      border-left: 2px solid var(--border);
+      padding-left: 14px;
+      margin-bottom: 16px;
+    }
+
+    .preview-entry:last-child {
+      margin-bottom: 0;
+    }
+
+    .preview-version {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 5px;
+      transition: color 0.3s;
+    }
+
+    .preview-change {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      transition: color 0.3s;
+    }
+
+    .preview-change .tag {
+      font-size: 9px;
+      padding: 1px 5px;
+      margin-top: 2px;
+    }
+
+    /* ── WIDGET EMBED ── */
+    .embed-section {
+      padding: 0 24px 90px;
+    }
+
+    .embed-card {
+      max-width: 680px;
+      margin: 0 auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .embed-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .embed-tab {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-dim);
+      padding: 10px 18px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .embed-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+
+    .embed-body {
+      padding: 20px 24px;
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--mono-text);
+      line-height: 1.7;
+      background: var(--mono-bg);
+      filter: blur(3px);
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .code-key {
+      color: var(--tag-new-fg);
+    }
+
+    .code-val {
+      color: var(--tag-impr-fg);
+    }
+
+    .code-str {
+      color: var(--tag-fixed-fg);
+    }
+
+    /* ── CTA ── */
+    .cta-strip {
+      text-align: center;
+      padding: 80px 24px 100px;
+      background: var(--bg-secondary);
+      transition: background 0.3s;
+    }
+
+    .cta-strip h2 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(28px, 4vw, 48px);
+      letter-spacing: -1.2px;
+      color: var(--text);
+      margin-bottom: 10px;
+      transition: color 0.3s;
+    }
+
+    .cta-strip p {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      transition: color 0.3s;
+    }
+
+    .cta-strip a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: var(--accent-fg);
+      text-decoration: none;
+      padding: 13px 28px;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: opacity .2s, transform .15s, background 0.3s, color 0.3s;
+    }
+
+    .cta-strip a:hover {
+      opacity: .85;
+      transform: translateY(-1px);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 720px) {
+      nav {
+        display: none;
+      }
+
+      .source-grid,
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hosted-cols {
+        grid-template-columns: 1fr;
+      }
+
+      .demo-cols {
+        grid-template-columns: 1fr;
+      }
+
+      .demo-arrow {
+        display: none;
+      }
+
+      .email-pill {
+        padding: 5px 5px 5px 16px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .email-pill {
+        flex-wrap: wrap;
+        border-radius: 18px;
+        padding: 10px 12px;
+      }
+
+      .email-pill input {
+        width: 100%;
+        padding: 4px 0;
+      }
+
+      .btn-pill {
+        width: 100%;
+        justify-content: center;
+        border-radius: 12px;
+      }
+
+      .header-wrap {
+        width: calc(100% - 24px);
+        top: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <div class="header-wrap">
+    <header>
+      <a href="#" class="logo">
+        <div class="logo-icon">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="4" height="4" rx="1" fill="var(--accent-fg)" />
+            <rect x="8" y="2" width="4" height="4" rx="1" fill="var(--accent-fg)" opacity=".6" />
+            <rect x="2" y="8" width="4" height="4" rx="1" fill="var(--accent-fg)" opacity=".6" />
+            <rect x="8" y="8" width="4" height="4" rx="1" fill="var(--accent-fg)" opacity=".25" />
+          </svg>
+        </div>
+        <span class="logo-text">ShipLog</span>
+      </a>
+      <nav>
+        <a href="#product">Product</a>
+        <a href="#waitlist">Waitlist</a>
+      </nav>
+      <div class="header-right">
+        <div class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+          <span class="toggle-icon" id="toggle-sun">☀️</span>
+          <div class="toggle-track">
+            <div class="toggle-knob"></div>
+          </div>
+        </div>
+        <a href="#waitlist" class="btn-start">Get early access →</a>
+      </div>
+    </header>
+  </div>
+
+  <div class="page">
+
+    <!-- HERO -->
+    <section class="hero" id="waitlist">
+      <h1>Your changelog,<br><em>written for you.</em></h1>
+      <p class="hero-sub">
+        ShipLog reads your commits, PRs, and merges and rewrites them into
+        a beautiful changelog your users actually understand and see.
+      </p>
+
+      <!-- Email Form -->
+      <div class="email-pill-wrap" id="pill-wrap">
+        <div class="email-pill" id="email-pill">
+          <input type="email" id="email-input" placeholder="Enter your email" autocomplete="off">
+          <button class="btn-pill" id="join-btn">
+            Get early access <span class="arr">→</span>
+          </button>
+        </div>
+        <p class="pill-note">
+          Be the first to know when we launch.
+        </p>
+      </div>
+
+      <!-- Success Message -->
+      <div class="pill-success" id="pill-success" style="display: none;">
+        ✦ &nbsp;You're on the list — we'll be in touch soon.
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- HOW IT WORKS -->
+    <section class="how" id="product">
+      <div class="section-inner">
+        <h2 class="section-headline">From messy git history<br><em>to polished changelog.</em></h2>
+        <p class="section-desc">ShipLog watches your repo and turns everything that matters — commits, PRs, and merges —
+          into clear, user-friendly release notes.</p>
+
+        <div class="source-grid">
+          <div class="source-card">
+            <div class="source-icon ic-green"><span style="color:var(--tag-fixed-fg)">⊙</span></div>
+            <h3>Commits</h3>
+            <p>Every push to your main branch is picked up. Messy commit messages like <code
+                style="font-size:11px;background:var(--mono-bg);padding:1px 5px;border-radius:4px;">fix: null ptr middleware token exp</code>
+              become clear, readable entries in seconds.</p>
+          </div>
+          <div class="source-card">
+            <div class="source-icon ic-blue"><span style="color:var(--tag-new-fg)">⊗</span></div>
+            <h3>Pull Requests</h3>
+            <p>PR titles and descriptions have context commits don't. ShipLog uses both — the PR narrative and the diff
+              — to write entries that explain the why, not just the what.</p>
+          </div>
+          <div class="source-card">
+            <div class="source-icon ic-amber"><span style="color:var(--tag-impr-fg)">⊕</span></div>
+            <h3>Merges & Releases</h3>
+            <p>Tagged releases and merge commits are grouped into versioned changelog sections automatically. No manual
+              versioning, no release note templates to fill out.</p>
+          </div>
+        </div>
+
+        <!-- Transform demo -->
+        <div class="transform-demo">
+          <div class="demo-dots">
+            <div class="dd r"></div>
+            <div class="dd y"></div>
+            <div class="dd g"></div>
+          </div>
+          <div class="demo-cols">
+            <div>
+              <div class="demo-label">Raw from GitHub</div>
+              <div class="demo-raw">
+                Merge PR #142: auth overhaul<br>
+                fix: null ptr with middleware<br>
+                token exp<br>
+                <br>
+                fix: email validation regex<br>
+                wip: stripe webhook handler<br>
+                Added Stripe webhook (wip)<br>
+              </div>
+            </div>
+            <div class="demo-arrow">→</div>
+            <div>
+              <div class="demo-label">ShipLog output (What your users See)</div>
+              <div class="demo-out">
+                <div class="demo-line"><span class="tag fx">Fixed</span><span>Resolved a bug where users were
+                    occasionally logged out due to expired auth tokens.</span></div>
+                <div class="demo-line"><span class="tag fx">Fixed</span><span>Email validation now correctly handles
+                    edge-case address formats on sign-up.</span></div>
+                <div class="demo-line"><span class="tag nw">New</span><span>Added Stripe webhook support for real-time
+                    payment event handling.</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- FEATURES -->
+    <section class="product" id="product">
+      <div class="section-inner">
+        <p class="section-label">Features</p>
+        <h2 class="section-headline">Everything your changelog needs.<br><em>Nothing it doesn't.</em></h2>
+        <p class="section-desc">Built for developers who ship fast and have no time to document everything by hand.</p>
+
+        <div class="features-grid">
+          <div class="feat-card">
+            <div class="feat-icon ic-green"><span style="color:var(--tag-fixed-fg)">✦</span></div>
+            <h3>AI-powered rewriting</h3>
+            <p>ShipLog reads your commits, PRs, and diffs and rewrites them as clear, jargon-free entries your users
+              actually want to read.</p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon ic-blue"><span style="color:var(--tag-new-fg)">🌐</span></div>
+            <h3>Hosted changelog</h3>
+            <p>You can host your changelog on ShipLog out of the box. Share it with your users, link it from your site,
+              or post it on social.</p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon ic-blue"><span style="color:var(--tag-new-fg)">&lt;/&gt;</span></div>
+            <h3>One-line widget embed</h3>
+            <p>Drop a single <code
+                style="font-size:11px;background:var(--mono-bg);padding:1px 5px;border-radius:4px;">&lt;script&gt;</code>
+              into your app. A "What's new" widget appears in your navbar, corner, or sidebar — no extra pages or
+              routing needed.</p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon ic-amber"><span style="color:var(--tag-impr-fg)">◈</span></div>
+            <h3>Fully customizable</h3>
+            <p>Match your brand colors exactly, choose widget position, pick entry categories, and make the changelog
+              feel like it was built for your product — because it is.</p>
+          </div>
+          <div class="feat-card">
+            <div class="feat-icon ic-green"><span style="color:var(--tag-fixed-fg)">↻</span></div>
+            <h3>Always up to date</h3>
+            <p>Every push to GitHub refreshes your changelog automatically. No manual updates, no forgotten release
+              notes. Just ship — ShipLog handles the rest.</p>
+          </div>
+
+
+          <div class="feat-card">
+            <div class="feat-icon ic-amber"><span style="color:var(--tag-impr-fg)">◎</span></div>
+            <h3>Widget analytics</h3>
+            <p>See open rates, which entries get clicks, and how engaged your audience is. Know which features your
+              users care about most.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- HOSTED CHANGELOG PAGE -->
+    <section class="hosted" id="hosted">
+      <div class="hosted-cols">
+        <div class="hosted-text">
+          <p class="section-label" style="text-align:left;">Hosted changelog page</p>
+          <h2>A public changelog page,<br><em>no code required.</em></h2>
+          <p>Don't want to embed a widget? Every ShipLog project gets a hosted, publicly shareable changelog page out of
+            the box. Share it with your users, link it from your docs, or post it on social.</p>
+          <p>Your page lives at a clean URL like:</p>
+          <div class="hosted-url">getshiplog.site/<strong>yourproject</strong></div>
+          <br>
+
+        </div>
+        <div class="hosted-preview">
+          <div class="preview-bar">
+            <div class="preview-dd r"></div>
+            <div class="preview-dd y"></div>
+            <div class="preview-dd g"></div>
+            <div class="preview-url">getshiplog.site/yourproject</div>
+          </div>
+          <div class="preview-body">
+            <br><br>
+            <div style="text-align: center;" class="preview-title">working on it...</div>
+            <br><br>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- EMBED CODE -->
+    <section class="embed-section" id="embed">
+      <div class="section-inner">
+        <h2 class="section-headline" style="margin-bottom:10px;">Two ways to ship your changelog.</h2>
+        <p class="section-desc">Pick what fits your workflow — or use both.</p>
+        <div class="embed-card">
+          <div class="embed-tabs">
+            <div class="embed-tab active">Widget embed</div>
+            <div class="embed-tab" style="opacity:.5;">Hosted page (auto)</div>
+          </div>
+          <div class="embed-body">
+            <span style="color:var(--text-dim);">&lt;!-- Drop this before &lt;/body&gt; --&gt;</span><br>
+            &lt;<span class="code-key">script</span><br>
+            &nbsp;&nbsp;<span class="code-key">src</span>=<span class="code-str">"you were not supposed to see
+              😂"</span><br>
+            &nbsp;&nbsp;<span class="code-key">i'm still working on it</span>=<span
+              class="code-str">"your-project-id"</span><br>
+            &nbsp;&nbsp;<span class="code-key">data-position</span>=<span class="code-str">""</span><br>
+            &nbsp;&nbsp;<span class="code-key">data-theme</span>=<span class="code-str">""</span><br>
+            &gt;&lt;/<span class="code-key">script</span>&gt;
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <div class="cta-strip">
+      <h2>Start shipping with confidence.</h2>
+      <a href="#waitlist">Reserve your spot →</a>
+    </div>
+
+  </div>
+
+  <script>
+    /* ── THEME TOGGLE ── */
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+      localStorage.setItem('shiplog-theme', isDark ? 'light' : 'dark');
+    }
+
+    // Restore saved theme
+    (function () {
+      const saved = localStorage.getItem('shiplog-theme');
+      if (saved) document.documentElement.setAttri2bute('data-theme', saved);
+    })();
+
+    /* ── FORM ── */
+    async function handleJoin() {
+      const email = document.getElementById('email-input').value.trim();
+      const pill = document.getElementById('email-pill');
+      const pillWrap = document.getElementById('pill-wrap');
+      const successMsg = document.getElementById('pill-success');
+
+      if (!email || !email.includes('@')) {
+        pill.classList.add('error');
+        setTimeout(() => pill.classList.remove('error'), 1800);
+        return;
+      }
+
+      const btn = document.querySelector('.btn-pill');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = 'Joining...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await res.json();
+
+        pillWrap.style.display = 'none';
+        successMsg.style.display = 'flex';
+        successMsg.innerHTML = data.message || "✦ You're on the list — we'll be in touch soon.";
+
+      } catch (err) {
+        successMsg.style.display = 'flex';
+        successMsg.innerHTML = "Something went wrong. Please try again.";
+      }
+
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+
+
+    /* ── SMOOTH SCROLL ── */
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+
+</html>
