@@ -10,7 +10,6 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap"
     rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *,
     *::before,
@@ -435,18 +434,12 @@
 
     .pill-success {
       display: none;
-      align-items: center;
-      gap: 10px;
       font-size: 14px;
       color: var(--tag-fixed-fg);
-      background: var(--tag-fixed-bg);
-      border: 1px solid currentColor;
-      border-color: var(--tag-fixed-fg);
-      border-radius: 100px;
-      padding: 13px 26px;
       max-width: 480px;
-      justify-content: center;
-      opacity: 0.85;
+      margin: 0 auto;
+      text-align: center;
+      line-height: 1.5;
     }
 
     /* ── COUNT ROW ── */
@@ -1143,12 +1136,12 @@
 
       <!-- Email Form -->
       <div class="email-pill-wrap" id="pill-wrap">
-        <div class="email-pill" id="email-pill">
-          <input type="email" id="email-input" placeholder="Enter your email" autocomplete="off">
-          <button class="btn-pill" id="join-btn">
+        <form class="email-pill" id="email-pill">
+          <input type="email" id="email-input" placeholder="Enter your email" autocomplete="email" required>
+          <button type="submit" class="btn-pill" id="join-btn">
             Get early access <span class="arr">→</span>
           </button>
-        </div>
+        </form>
         <p class="pill-note">
           Be the first to know when we launch.
         </p>
@@ -1360,10 +1353,15 @@
     // Restore saved theme
     (function () {
       const saved = localStorage.getItem('shiplog-theme');
-      if (saved) document.documentElement.setAttri2bute('data-theme', saved);
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
     })();
 
     /* ── FORM ── */
+    document.getElementById('email-pill').addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleJoin();
+    });
+
     async function handleJoin() {
       const email = document.getElementById('email-input').value.trim();
       const pill = document.getElementById('email-pill');
@@ -1391,12 +1389,12 @@
         const data = await res.json();
 
         pillWrap.style.display = 'none';
-        successMsg.style.display = 'flex';
+        successMsg.style.display = 'block';
         successMsg.innerHTML = data.message || "✦ You're on the list — we'll be in touch soon.";
 
       } catch (err) {
-        successMsg.style.display = 'flex';
-        successMsg.innerHTML = "Something went wrong. Please try again.";
+        successMsg.style.display = 'block';
+        successMsg.innerHTML = 'Something went wrong. Please try again.';
       }
 
       btn.innerHTML = originalText;
